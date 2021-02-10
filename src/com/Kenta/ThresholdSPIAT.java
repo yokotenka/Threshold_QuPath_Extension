@@ -95,6 +95,7 @@ public class ThresholdSPIAT implements Thresholder{
 
         // Get the marker intensities from spreadsheet
         double[] markerIntensities = cells.stream()
+                .parallel()
                 .mapToDouble(p -> p.getMeasurementList().getMeasurementValue(columnName))
                 .filter(d -> !Double.isNaN(d)).toArray();
 
@@ -125,47 +126,62 @@ public class ThresholdSPIAT implements Thresholder{
 
         // For tumour marker
         ////////############################################## Might need to change.
-        if (markerName.equals(getTumourMarkerName())) {
+        if (markerName.equals(tumourMarker.getMarkerName())) {
             // Calculations for the tumour marker
+            double[] nanIncludedMarkerIntensity = cells.stream().parallel()
+                    .mapToDouble(p -> p.getMeasurementList().getMeasurementValue(columnName)).toArray();
+
+
             List<Integer> filteredIntensityIndices = new ArrayList<>();
 
             // Iterate through the baseline markers
             for (SPIATMarkerInformation baselineMarker : this.baselineMarkers){
-                String baselineColumnName = baselineMarker.getMarkerName();
+                String baselineColumnName = baselineMarker.getMeasurementName();
 
                 // Get the baseline marker intensities
-                double[] baselineMarkerIntensities = cells.stream()
-                        .mapToDouble(p -> p.getMeasurementList().getMeasurementValue(baselineColumnName))
-                        .filter(d -> !Double.isNaN(d)).toArray();
+                double[] baselineMarkerIntensities = cells.stream().parallel()
+                        .mapToDouble(p -> p.getMeasurementList().getMeasurementValue(baselineColumnName)).toArray();
+
 
                 // Get the baseline marker threshold
                 double baselineThreshold = calculateThresholdForSingleMarker(baselineMarker);
 
-                // Get all the cells indices which have an intensity which is above threshold
-                filteredIntensityIndices.addAll(IntStream.range(0, baselineMarkerIntensities.length)
-                                                            .filter(i -> baselineMarkerIntensities[i] > baselineThreshold)
-                                                            .filter(i -> !filteredIntensityIndices.contains(i))
-                                                            .boxed()
-                                                            .collect(Collectors.toList()));
+                for (int i=0; i < cells.size(); i++){
+                    if (!Double.isNaN(baselineMarkerIntensities[i]) && !Double.isNaN(nanIncludedMarkerIntensity[i])){
+                        if (baselineMarkerIntensities[i] > baselineThreshold) {
+                            if (!filteredIntensityIndices.contains(i)) {
+                                filteredIntensityIndices.add(i);
+                            }
+                        }
+                    }
+                }
             }
 
-            // Change the indices into intensities
+
             double[] filteredIntensities = new double[filteredIntensityIndices.size()];
 
-            for (int j=0; j<filteredIntensities.length; j++){
-                filteredIntensities[j] = markerIntensities[filteredIntensityIndices.get(j)];
+
+            for (int j=0; j<filteredIntensityIndices.size(); j++){
+                int inde = filteredIntensityIndices.get(j);
+                double num = nanIncludedMarkerIntensity[inde];
+                filteredIntensities[j] = num;
             }
-
-
             // Get the 95th percentile for all cells which are positive for the baseline cells
             DescriptiveStatistics stats = new DescriptiveStatistics(filteredIntensities);
             double cutOffForTumour = stats.getPercentile(95);
+
+
 
             // get the threshold for the tumour marker
             for (int index : minimaIndex) {
                 if (getValueAtX(index) < getValueAtX(maxDensity.getIndex())) {
                     continue;
                 }
+                if (Double.isNaN(cutOffForTumour)){
+                    threshold = getValueAtX(index);
+                    break;
+                }
+
                 // Get the first threshold and compare to the cutOffForTumour.
                 if (Double.compare(getValueAtX(index), cutOffForTumour) <= 0) {
                     threshold = getValueAtX(index);
@@ -197,22 +213,11 @@ public class ThresholdSPIAT implements Thresholder{
 
         // Get the percentage expression of the marker
         double finalThreshold = threshold;
-        long count = Arrays.stream(markerIntensities).filter(markerIntensity -> Double.compare(markerIntensity, finalThreshold) >0).count();
-        double percentage = (double) (count / markerIntensities.length) * 100;
-        marker.setExpressionProportion(percentage);
+        long count = Arrays.stream(markerIntensities).parallel().filter(markerIntensity -> Double.compare(markerIntensity, finalThreshold) >0).count();
+        marker.setExpressionProportion(((double) count / markerIntensities.length));
+        marker.setCount((int) count);
 
-        // Set the path classes for the cells
-        getCells()
-            .stream()
-                .filter(it -> it.getMeasurementList().getMeasurementValue(columnName) > finalThreshold)
-                .forEach(it -> {
-                            if (it.getPathClass()==null){
-                                it.setPathClass(PathClassFactory.getPathClass(markerName));
-                            } else{
-                                it.setPathClass(PathClassFactory.getDerivedPathClass(it.getPathClass(), markerName, null));
-                            }
-                        }
-                );
+        setCellPathClass(columnName, markerName, finalThreshold);
 
         // return the threshold
         return threshold;
@@ -307,9 +312,6 @@ public class ThresholdSPIAT implements Thresholder{
         return x[i];
     }
 
-    public String getTumourMarkerName() {
-        return tumourMarker.getMarkerName();
-    }
 
     /**
      * Gets the marker information map
@@ -330,5 +332,21 @@ public class ThresholdSPIAT implements Thresholder{
         }
 
         return array;
+    }
+
+    public void setCellPathClass(String columnName, String markerName, double finalThreshold){
+        // Set the path classes for the cells
+        getCells()
+                .stream()
+                .parallel()
+                .filter(it -> it.getMeasurementList().getMeasurementValue(columnName) > finalThreshold)
+                .forEach(it -> {
+                            if (it.getPathClass()==null){
+                                it.setPathClass(PathClassFactory.getPathClass(markerName));
+                            } else{
+                                it.setPathClass(PathClassFactory.getDerivedPathClass(it.getPathClass(), markerName, null));
+                            }
+                        }
+                );
     }
 }

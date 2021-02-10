@@ -11,6 +11,7 @@ public class SPIATMarkerInformation {
     private double threshold = -1;
     private double[] estimatedDensity;
     private double expressionProportion;
+    private int count;
 
     private Series mainSeries;
     private Series thresholdLine;
@@ -63,8 +64,10 @@ public class SPIATMarkerInformation {
     public void setThresholdLine(Series line){
         this.thresholdLine = line;
     }
+    public void setCount(int count){this.count = count; }
 
     // Getters
+    public int getCount(){return count;}
     public double getExpressionProportion() {
         return expressionProportion;
     }

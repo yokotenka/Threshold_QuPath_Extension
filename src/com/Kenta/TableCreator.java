@@ -10,6 +10,26 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import java.util.Collection;
 
 public class TableCreator {
+    private TableView<MarkerTableEntry> table;
+
+
+    public TableCreator (){
+        this.table = new TableView<>();
+    }
+
+    public void addItems(ObservableList<MarkerTableEntry> markers){
+        table.setItems(markers);
+    }
+
+    public void addColumn(String title, String variableName){
+        table.getColumns().add(TableCreator.createColumn(title, variableName));
+    }
+
+    public TableView getTable(){
+        return table;
+    }
+
+
 
     public static TableColumn<MarkerTableEntry, Object> createColumn(String title, String variableName){
         TableColumn<MarkerTableEntry, Object> nameCol = new TableColumn<>(title);

@@ -1,6 +1,7 @@
 package com.Kenta;
 
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableArray;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
@@ -18,6 +19,7 @@ import com.Kenta.TableCreator;
 import com.Kenta.SPIATMarkerInformation;
 import com.Kenta.ThresholdSPIAT;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.gui.viewer.QuPathViewer;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
@@ -48,7 +50,7 @@ public class ThresholdSPIATWindow implements Runnable{
 
     private ObservableList<MarkerTableEntry> markers;
     private LineChart<Number, Number> lineChart;
-    private TableView<MarkerTableEntry> resultsTable;
+    private TableCreator resultsTable;
 
     private ArrayList<SPIATMarkerInformation> selectedMarkers;
     private ArrayList<SPIATMarkerInformation> baselineMarkers;
@@ -73,8 +75,6 @@ public class ThresholdSPIATWindow implements Runnable{
 
 
     protected Stage createDialog() {
-
-
 
         // Get all the QuPath data
         viewer = qupath.getViewer();
@@ -176,17 +176,24 @@ public class ThresholdSPIATWindow implements Runnable{
         gridPane.add(initialiseLineChart(), 2, row_col2++, 2, 1);
 
 
-        // Results Stats
+        // Results label
         gridPane.add(createLabel("Threshold and Expression Proportions"), 4, 0);
 
-
-
-        resultsTable = new TableView<>();
-        gridPane.add(resultsTable, 4, 1);
+        // Results table
+        resultsTable = new TableCreator();
+        resultsTable.addColumn("Marker", "name");
+        resultsTable.addColumn("Measurement", "comboBoxValue");
+        resultsTable.addColumn("Threshold", "threshold");
+        resultsTable.addColumn("Proportion", "proportion");
+        resultsTable.addColumn("Count", "count");
+        gridPane.add(resultsTable.getTable(), 4, 1);
 
         startButton.setOnAction((event) -> {
             // This may not work
-            resetDetectionClassifications();
+            QPEx.resetDetectionClassifications();
+
+            imageData.getHierarchy().getDetectionObjects().forEach(it -> it.setPathClass(null));
+
 
             String tumourMarkerName = tumourBox.getValue();
             StringBuilder invalidInputs = new StringBuilder();
@@ -195,6 +202,7 @@ public class ThresholdSPIATWindow implements Runnable{
 
             ///////// Add in a way to save options and load options. also save results
             selectedMarkers = new ArrayList<>();
+            ObservableList<MarkerTableEntry> selectedMarkersResults = FXCollections.observableArrayList();
             baselineMarkers = new ArrayList<>();
             lineChart.getData().clear();
             /*
@@ -205,6 +213,7 @@ public class ThresholdSPIATWindow implements Runnable{
             for (MarkerTableEntry marker : markers) {
                 if (marker.isSelected()){
                     selectedMarkers.add(marker.getMarkerInfo());
+                    selectedMarkersResults.add(marker);
                 }
                 if (marker.isBaselineMarker()){
                     baselineMarkers.add(marker.getMarkerInfo());
@@ -220,6 +229,7 @@ public class ThresholdSPIATWindow implements Runnable{
                 if (!marker.setMeasurementName()){
                     measurementNotSelected.append(marker.getName()).append(", ");
                 }
+                marker.setThreshold(-5);
             }
 
 
@@ -254,18 +264,13 @@ public class ThresholdSPIATWindow implements Runnable{
             populateGraph(thresholdSPIAT);
 
             // Set the path classes
-            setCellPathClass(thresholdSPIAT);
+//            setCellPathClass(thresholdSPIAT);
 
-            fireHierarchyUpdate();
+//            fireHierarchyUpdate();
+            resultsTable.getTable().getItems().clear();
+            resultsTable.addItems(selectedMarkersResults);
 
 
-//            resultsTable = TableCreator.createTable(
-//                    FXCollections.observableArrayList(selectedMarkers),
-//                    TableCreator.createColumn("Marker", "name"),
-//                    TableCreator.createColumn("Threshold", "threshold"),
-//                    TableCreator.createColumn("Proportion", "proportion")
-//            );
-//            gridPane.add(resultsTable, 4, 1);
         });
 
 
@@ -292,7 +297,7 @@ public class ThresholdSPIATWindow implements Runnable{
                     if (currentlySelected != null) {
                         imageData.getHierarchy().getSelectionModel().deselectObjects(currentlySelected);
                     }
-                    List<PathObject> positive = cells.stream().filter(
+                    List<PathObject> positive = cells.stream().parallel().filter(
                             it -> checkForClassifications(it.getPathClass(), selectedForResults)
                             ).collect(Collectors.toList());
                     imageData.getHierarchy().getSelectionModel().selectObjects(positive);
@@ -349,7 +354,7 @@ public class ThresholdSPIATWindow implements Runnable{
      * @param thresholdSPIAT line chart
      */
     private void populateGraph(ThresholdSPIAT thresholdSPIAT){
-
+        lineChart.getData().clear();
         int i=0;
         for (SPIATMarkerInformation marker : thresholdSPIAT.getMarkerInformationMap().values()) {
             // Marker name
@@ -383,6 +388,7 @@ public class ThresholdSPIATWindow implements Runnable{
 
         // Potentially could be a source of error #################################################
         return measurementList.stream()
+                .parallel()
                 .filter(it -> it.contains(markerName))
                 .map(it -> it.substring(markerName.length()+2))
                 .collect(Collectors.toList());
@@ -391,7 +397,7 @@ public class ThresholdSPIATWindow implements Runnable{
 
     private void setCellPathClass(ThresholdSPIAT thresholdSPIAT){
         for (SPIATMarkerInformation marker : thresholdSPIAT.getMarkerInformationMap().values()){
-            List<PathObject> positive = cells.stream().filter(it ->
+            List<PathObject> positive = cells.stream().parallel().filter(it ->
                     it.getMeasurementList().getMeasurementValue(marker.getMeasurementName())
                             > marker.getThreshold()).collect(Collectors.toList());
 

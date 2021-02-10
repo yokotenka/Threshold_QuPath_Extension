@@ -66,6 +66,8 @@ public class MarkerTableEntry {
         return markerInfo.getExpressionProportion();
     }
 
+    public int getCount(){return markerInfo.getCount();}
+
     public SPIATMarkerInformation getMarkerInfo() {
         return markerInfo;
     }
