@@ -126,7 +126,7 @@ public class ThresholdSPIAT implements Thresholder{
 
         // For tumour marker
         ////////############################################## Might need to change.
-        if (markerName.equals(tumourMarker.getMarkerName())) {
+        if (tumourMarker != null && markerName.equals(tumourMarker.getMarkerName())) {
             // Calculations for the tumour marker
             double[] nanIncludedMarkerIntensity = cells.stream().parallel()
                     .mapToDouble(p -> p.getMeasurementList().getMeasurementValue(columnName)).toArray();
@@ -217,7 +217,7 @@ public class ThresholdSPIAT implements Thresholder{
         marker.setExpressionProportion(((double) count / markerIntensities.length));
         marker.setCount((int) count);
 
-        setCellPathClass(columnName, markerName, finalThreshold);
+//        setCellPathClass(columnName, markerName, finalThreshold);
 
         // return the threshold
         return threshold;
@@ -334,19 +334,4 @@ public class ThresholdSPIAT implements Thresholder{
         return array;
     }
 
-    public void setCellPathClass(String columnName, String markerName, double finalThreshold){
-        // Set the path classes for the cells
-        getCells()
-                .stream()
-                .parallel()
-                .filter(it -> it.getMeasurementList().getMeasurementValue(columnName) > finalThreshold)
-                .forEach(it -> {
-                            if (it.getPathClass()==null){
-                                it.setPathClass(PathClassFactory.getPathClass(markerName));
-                            } else{
-                                it.setPathClass(PathClassFactory.getDerivedPathClass(it.getPathClass(), markerName, null));
-                            }
-                        }
-                );
-    }
 }

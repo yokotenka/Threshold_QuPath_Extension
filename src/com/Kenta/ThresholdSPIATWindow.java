@@ -5,7 +5,6 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.value.ChangeListener;
 import javafx.beans.value.ObservableValue;
 import javafx.collections.FXCollections;
-import javafx.collections.ObservableArray;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
@@ -19,22 +18,25 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.stage.Stage;
-import com.Kenta.MarkerTableEntry;
-import com.Kenta.TableCreator;
-import com.Kenta.SPIATMarkerInformation;
-import com.Kenta.ThresholdSPIAT;
+import qupath.lib.classifiers.object.ObjectClassifier;
+import qupath.lib.classifiers.object.ObjectClassifiers;
+import qupath.lib.classifiers.object.ObjectClassifiers.ClassifyByMeasurementBuilder;
+import qupath.lib.common.GeneralTools;
 import qupath.lib.gui.QuPathGUI;
+import qupath.lib.gui.dialogs.Dialogs;
 import qupath.lib.gui.scripting.QPEx;
 import qupath.lib.gui.viewer.QuPathViewer;
 import qupath.lib.images.ImageData;
 import qupath.lib.images.servers.ImageServer;
-import qupath.lib.objects.PathDetectionObject;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.classes.PathClassFactory;
+import qupath.lib.projects.Project;
+import qupath.lib.projects.Projects;
 
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeEvent;
@@ -42,14 +44,13 @@ import java.beans.PropertyChangeListener;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
-import qupath.lib.gui.commands.Commands;
 
 import static qupath.lib.scripting.QP.*;
 
-public class ThresholdSPIATWindow implements Runnable {
+public class ThresholdSPIATWindow implements Runnable, ChangeListener<ImageData<BufferedImage>>, PropertyChangeListener {
     private Stage dialog;
     private final QuPathGUI qupath;
     private QuPathViewer viewer;
@@ -60,9 +61,20 @@ public class ThresholdSPIATWindow implements Runnable {
 
     private ObservableList<MarkerTableEntry> markers;
     private LineChart<Number, Number> lineChart;
-    private Pane pane;
+    private StackPane pane;
     private Line prevLine;
     private TableCreator resultsTable;
+
+    private GridPane gridPane;
+//    private Button saveClassifier;
+    private ComboBox<String> tumourBox;
+    private ComboBox<String> comboBoxResults;
+    private Button startButton;
+    private TextField classifierName;
+    private Button saveClassifierButton;
+
+
+
 
     private ArrayList<SPIATMarkerInformation> selectedMarkers;
     private ObservableList<MarkerTableEntry> selectedMarkersResults;
@@ -72,6 +84,11 @@ public class ThresholdSPIATWindow implements Runnable {
     private ThresholdSPIAT thresholdSPIAT;
 
     private Collection<PathObject> currentlySelected;
+
+    private String title = "SPIAT Threshold";
+    private TextField resultsTableName;
+    private Button saveResultsTableButton;
+    private Button chooseButton;
 
     public ThresholdSPIATWindow(QuPathGUI qupath) {
         this.qupath = qupath;
@@ -142,57 +159,57 @@ public class ThresholdSPIATWindow implements Runnable {
 //        int row_col1 = 0;
 
         // Initialise the grid
-        GridPane gridPane = new GridPane();
+        gridPane = new GridPane();
         gridPane.setVgap(5);
         gridPane.setPadding(new Insets(10, 10, 10, 10));
 
 
         // For selecting the markers which threshold will be applied
-        gridPane.add(createLabel("Select the markers to apply threshold:"), col, row_col0++, 1, 1);
-
-        // Create and add table to grid pane
-
+        gridPane.add(createLabel("Select the markers to apply threshold"), col, row_col0++, 2, 1);
         gridPane.add(
                 TableCreator.createTable(
                         markers,
                         TableCreator.createColumn("Marker", "name"),
                         TableCreator.createColumn("Select", "isSelectedForThreshold"),
-                        TableCreator.createColumn("Select\n Baseline Marker", "isBaselineMarker"),
+                        TableCreator.createColumn("Select\nBaseline Marker", "isBaselineMarker"),
                         TableCreator.createColumn("Measurement", "measurement")
                 ),
                 col,
-                row_col0++
+                row_col0++,
+                2,
+                2
         );
+        row_col0++;
+        gridPane.add(createLabel("Select tumour marker "), 0, row_col0, 1, 1);
+        tumourBox = new ComboBox<>(markerNames);
+        gridPane.add(tumourBox, 1, row_col0++, 1, 1);
 
-        // ComboBox for selecting tumour marker
-        gridPane.add(createLabel("Select tumour marker:"), 0, row_col0++, 3, 1);
-        ComboBox<String> tumourBox = new ComboBox<>(markerNames);
-        gridPane.add(tumourBox, 0, row_col0++);
-
-
-        // Start button
-        Button startButton = new Button("Run Threshold");
+        startButton = new Button("Run Threshold");
         gridPane.add(startButton, col, row_col0++);
 
 
+
+
+
+
         // Separator
-        gridPane.add(new Separator(Orientation.VERTICAL), 1, 0, 1, row_col0++);
+        gridPane.add(new Separator(Orientation.VERTICAL), 2, 0, 1, row_col0++);
 
 
         // Results Selection
-        int row_col2 = 0;
-        gridPane.add(createLabel("Select marker to display results:"), 2, row_col2++);
-        ComboBox<String> comboBoxResults = new ComboBox<>();
-        gridPane.add(comboBoxResults, 3, 0);
+        int row_col3 = 0;
+        gridPane.add(createLabel("Select marker to display results "), 3, row_col3, 2, 1);
+        comboBoxResults = new ComboBox<>();
+        gridPane.add(comboBoxResults, 6, row_col3++, 1, 1);
 
         // Add the Results line chart to grid pane
-        pane = new Pane();
+        pane = new StackPane();
         pane.getChildren().add(initialiseLineChart());
-        gridPane.add(pane, 2, row_col2++, 2, 1);
+        gridPane.add(pane, 3, row_col3++, 4, 1);
 
 
         // Results label
-        gridPane.add(createLabel("Threshold and Expression Proportions"), 4, 0);
+//        gridPane.add(createLabel("Threshold and Expression Proportions"), 4, 0);
 
         // Results table
         resultsTable = new TableCreator();
@@ -201,21 +218,28 @@ public class ThresholdSPIATWindow implements Runnable {
         resultsTable.addColumn("Threshold", "threshold");
         resultsTable.addColumn("Proportion", "proportion");
         resultsTable.addColumn("Count", "count");
-        gridPane.add(resultsTable.getTable(), 4, 1);
+        resultsTable.getTable().setPrefSize(400, 100);
+        gridPane.add(resultsTable.getTable(), 3, row_col3++, 4, 1);
 
 
-        gridPane.add(createLabel("Enter name of the results file:"), 4, 2);
+        gridPane.add(createLabel("Classifier Name "), 3, row_col3, 1, 1);
+        classifierName = new TextField("SPIAT_Classifier");
+        gridPane.add(classifierName, 4, row_col3, 1, 1);
+        saveClassifierButton = new Button("Save & Apply");
+        gridPane.add(saveClassifierButton, 5, row_col3++, 2, 1);
 
 
-        String projFilePath = qupath.getProject().getURI().getPath();
-        String projPath = projFilePath.subSequence(0, projFilePath.length() - 14).toString();
-        String imageName = server.getMetadata().getName();
-        imageName = imageName.subSequence(0, imageName.length()- 4).toString();
-        TextField tb = new TextField(projPath + imageName + "_threshold_statistics.csv");
-        gridPane.add(tb, 4, 3);
+        gridPane.add(createLabel("Table Name "), 3, row_col3, 1, 1);
+        resultsTableName = new TextField("SPIAT_Table_Results");
+        gridPane.add(resultsTableName, 4, row_col3, 1, 1);
+        chooseButton = new Button("Choose"); 
+        gridPane.add(chooseButton, 5, row_col3, 1, 1);
+        saveResultsTableButton = new Button("Save");
+        gridPane.add(saveResultsTableButton, 6, row_col3++, 1, 1);
 
-        Button save = new Button("Save");
-        gridPane.add(save, 4, 4);
+
+//        saveClassifier = new Button("Save");
+//        gridPane.add(saveClassifier, 3, 4);
 
         startButton.setOnAction((event) -> {
             // This may not work
@@ -229,7 +253,6 @@ public class ThresholdSPIATWindow implements Runnable {
             StringBuilder measurementNotSelected = new StringBuilder();
 
 
-            ///////// Add in a way to save options and load options. also save results
             selectedMarkers = new ArrayList<>();
             selectedMarkersResults = FXCollections.observableArrayList();
             baselineMarkers = new ArrayList<>();
@@ -240,6 +263,7 @@ public class ThresholdSPIATWindow implements Runnable {
              as a baseline marker if selected.
             */
             boolean isBaselineAndTumour = false;
+            boolean isInvalid = false;
             for (MarkerTableEntry marker : markers) {
                 if (marker.isSelected()) {
                     selectedMarkers.add(marker.getMarkerInfo());
@@ -250,45 +274,46 @@ public class ThresholdSPIATWindow implements Runnable {
                 }
                 if (marker.isBaselineMarker() && !marker.isSelected()) {
                     invalidInputs.append(marker.getName()).append(", ");
-
+                    isInvalid = true;
                 }
 
                 if (marker.getName().equals(tumourMarkerName)) {
                     tumourMarker = marker.getMarkerInfo();
                     if (marker.isBaselineMarker()) {
                         isBaselineAndTumour = true;
+                        isInvalid = true;
                     }
                 }
                 if (!marker.setMeasurementName()) {
                     measurementNotSelected.append(marker.getName()).append(", ");
+                    isInvalid = true;
                 }
                 marker.setThreshold(-5);
             }
 
 
             // Checks
-            if (tumourMarkerName == null || !invalidInputs.toString().equals("")) {
-                Alert errorAlert = new Alert(Alert.AlertType.ERROR);
-                errorAlert.setHeaderText("Input not valid");
-                String errorMsg = "";
-                if (invalidInputs.toString().equals("")) {
-                    errorMsg = "The following markers were selected as baseline marker but not selected for thresholding:\n"
-                            + invalidInputs.subSequence(0, invalidInputs.length() - 2) + "\n";
-                }
 
-                if (measurementNotSelected.toString().equals("")) {
-                    errorMsg = "The following markers did not have a measurement selected: \n"
-                            + measurementNotSelected.subSequence(0, measurementNotSelected.length() - 2) + "\n";
-                }
-                if (tumourMarkerName == null) {
-                    errorMsg += "- " + "Tumour not selected";
-                }
-                if (isBaselineAndTumour) {
-                    errorMsg += "- Tumour is also selected as baseline marker. Cannot be both!\n";
-                }
+            String errorMsg = "";
+            if (!invalidInputs.toString().equals("")) {
+                Dialogs.showErrorMessage(title, "The following markers were selected as baseline marker but not selected for thresholding:\n"
+                        + invalidInputs.subSequence(0, invalidInputs.length() - 2) + "\n");
+            }
 
-                errorAlert.setContentText(errorMsg);
-                errorAlert.showAndWait();
+            if (!measurementNotSelected.toString().equals("")) {
+                Dialogs.showErrorMessage(title, "The following markers did not have a measurement selected: \n"
+                        + measurementNotSelected.subSequence(0, measurementNotSelected.length() - 2) + "\n");
+            }
+//                if (tumourMarkerName == null) {
+//                    errorMsg += "- " + "Tumour not selected";
+//                }
+            if (isBaselineAndTumour) {
+                Dialogs.showErrorMessage(title, "Tumour is also selected as baseline marker. Cannot be both!\n");
+            }
+//                Dialogs.showErrorMessage(title, errorMsg);
+//                return;
+            if (isInvalid) {
+                return; 
             }
 
             // Initialise the threshold algorithm
@@ -337,86 +362,14 @@ public class ThresholdSPIATWindow implements Runnable {
                     yAxis.setLowerBound(0);
 
                     // Change the upper bound of the intensity to suit the marker
-                    xAxis.setUpperBound(marker.getMaxIntensity());
+                    xAxis.setUpperBound(marker.getThreshold() * 1.5);
                     xAxis.setLowerBound(0);
-
-
-                    Line line = new Line();
-                    line.setStroke(new Color(0, 0, 0, 0.2));
-                    line.strokeWidthProperty().bind(new SimpleDoubleProperty(3));
-
-                    // Bind the requested x position of the line to the 'actual' coordinate within the parent
-                    line.startXProperty().bind(
-                            Bindings.createDoubleBinding(() -> {
-                                        double xAxisPosition = xAxis.getDisplayPosition(marker.getThreshold());
-                                        Point2D positionInScene = xAxis.localToScene(xAxisPosition, 0);
-                                        return pane.sceneToLocal(positionInScene).getX();
-                                    },
-                                    lineChart.widthProperty(),
-                                    lineChart.heightProperty(),
-                                    lineChart.boundsInParentProperty(),
-                                    xAxis.lowerBoundProperty(),
-                                    xAxis.upperBoundProperty(),
-                                    xAxis.autoRangingProperty(),
-                                    yAxis.autoRangingProperty(),
-                                    yAxis.lowerBoundProperty(),
-                                    yAxis.upperBoundProperty(),
-                                    yAxis.scaleProperty()
-                            )
-                    );
-
-                    // End position same as starting position for vertical line
-                    line.endXProperty().bind(line.startXProperty());
-
-                    // Bind the y coordinates to the top and bottom of the chart
-                    // Binding to scale property can cause 2 calls, but this is required
-                    line.startYProperty().bind(
-                            Bindings.createDoubleBinding(() -> {
-                                        double yAxisPosition = yAxis.getDisplayPosition(yAxis.getLowerBound());
-                                        Point2D positionInScene = yAxis.localToScene(0, yAxisPosition);
-                                        return pane.sceneToLocal(positionInScene).getY();
-                                    },
-                                    lineChart.widthProperty(),
-                                    lineChart.heightProperty(),
-                                    lineChart.boundsInParentProperty(),
-                                    xAxis.lowerBoundProperty(),
-                                    xAxis.upperBoundProperty(),
-                                    xAxis.autoRangingProperty(),
-                                    yAxis.autoRangingProperty(),
-                                    yAxis.lowerBoundProperty(),
-                                    yAxis.upperBoundProperty(),
-                                    yAxis.scaleProperty()
-                            )
-                    );
-                    line.endYProperty().bind(
-                            Bindings.createDoubleBinding(() -> {
-                                        double yAxisPosition = yAxis.getDisplayPosition(yAxis.getUpperBound());
-                                        Point2D positionInScene = yAxis.localToScene(0, yAxisPosition);
-                                        return pane.sceneToLocal(positionInScene).getY();
-                                    },
-                                    lineChart.widthProperty(),
-                                    lineChart.heightProperty(),
-                                    lineChart.boundsInParentProperty(),
-                                    xAxis.lowerBoundProperty(),
-                                    xAxis.upperBoundProperty(),
-                                    xAxis.autoRangingProperty(),
-                                    yAxis.autoRangingProperty(),
-                                    yAxis.lowerBoundProperty(),
-                                    yAxis.upperBoundProperty(),
-                                    yAxis.scaleProperty()
-                            )
-                    );
-                    if (prevLine != null) {
-                        pane.getChildren().remove(prevLine);
-                    }
-                    pane.getChildren().add(line);
-                    prevLine = line;
 
                     if (currentlySelected != null) {
                         imageData.getHierarchy().getSelectionModel().deselectObjects(currentlySelected);
                     }
                     List<PathObject> positive = cells.stream().parallel().filter(
-                            it -> checkForClassifications(it.getPathClass(), selectedForResults)
+                            it -> Double.compare(it.getMeasurementList().getMeasurementValue(marker.getMeasurementName()),marker.getThreshold())>0
                     ).collect(Collectors.toList());
                     imageData.getHierarchy().getSelectionModel().selectObjects(positive);
                     currentlySelected = positive;
@@ -427,10 +380,24 @@ public class ThresholdSPIATWindow implements Runnable {
         });
 
         // Definitely exists a better way
-        save.setOnAction((event) -> {
+        saveClassifierButton.setOnAction((event) -> {
+            saveClassifiers();
+            setCellPathClass();
+        });
 
-                String fullFileName = tb.getText();
+        chooseButton.setOnAction((event) -> {
+                String ext = ".csv";
+                String extDesc = "CSV (Comma delimited)";
+                File pathOut = Dialogs.promptToSaveFile("Output file", Projects.getBaseDirectory(qupath.getProject()), "SPIAT_Table_Results" + ext, extDesc, ext);
+                if (pathOut != null) {
+                    if (pathOut.isDirectory())
+                        pathOut = new File(pathOut.getAbsolutePath() + File.separator + "SPIAT_Table_Results" + ext);
+                    resultsTableName.setText(pathOut.getAbsolutePath());
+                }
+        });
 
+        saveResultsTableButton.setOnAction((event) -> {
+                String fullFileName = resultsTableName.getText();
                 try {
                     writeExcel(fullFileName, selectedMarkersResults);
                 } catch (Exception e) {
@@ -443,14 +410,17 @@ public class ThresholdSPIATWindow implements Runnable {
         Stage stage = new Stage();
         stage.initOwner(QuPathGUI.getInstance().getStage());
         stage.setScene(new Scene(gridPane));
-        stage.setTitle("SPIAT Thresholding");
+        stage.setTitle(title);
+        stage.setHeight(500);
+        stage.setWidth(740);
+
         return stage;
     }
 
 
     private Label createLabel(String msg) {
         Label label = new Label(msg);
-        label.setFont(javafx.scene.text.Font.font(15));
+        label.setFont(javafx.scene.text.Font.font(14));
         label.setAlignment(Pos.CENTER);
         return label;
     }
@@ -473,6 +443,7 @@ public class ThresholdSPIATWindow implements Runnable {
         lineChart.setTitle("Density Estimation");
         lineChart.setCreateSymbols(false);
         lineChart.setLegendVisible(false);
+        lineChart.setPrefSize(400,100 );
 
         return lineChart;
     }
@@ -518,13 +489,13 @@ public class ThresholdSPIATWindow implements Runnable {
         // Potentially could be a source of error #################################################
         return measurementList.stream()
                 .parallel()
-                .filter(it -> it.contains(markerName))
+                .filter(it -> it.contains(markerName+":"))
                 .map(it -> it.substring(markerName.length() + 2))
                 .collect(Collectors.toList());
     }
 
 
-    private void setCellPathClass(ThresholdSPIAT thresholdSPIAT) {
+    private void setCellPathClass() {
         for (SPIATMarkerInformation marker : thresholdSPIAT.getMarkerInformationMap().values()) {
             List<PathObject> positive = cells.stream().parallel().filter(it ->
                     it.getMeasurementList().getMeasurementValue(marker.getMeasurementName())
@@ -574,14 +545,11 @@ public class ThresholdSPIATWindow implements Runnable {
     }
 
 
-
-
-
     public void writeExcel(String fileName, ObservableList<MarkerTableEntry> markers) throws Exception {
-        Writer writer = null;
         try {
             File file = new File(fileName);
-            writer = new BufferedWriter(new FileWriter(file));
+            Writer writer = new BufferedWriter(new FileWriter(file));
+            writer.write("Marker,Measurement,Threshold,Proportion,Count\n");
             for (MarkerTableEntry marker : markers) {
 
                 String text = marker.getName() + ","
@@ -592,12 +560,160 @@ public class ThresholdSPIATWindow implements Runnable {
 
                 writer.write(text);
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        } finally {
-
+            Dialogs.showInfoNotification(title, "Results table saved");
             writer.flush();
             writer.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
+
+
+
+
+
+    /**
+     * Try to save the classifier & return the name of the saved classifier if successful
+     * @return
+     */
+
+
+
+    private void saveClassifiers(){
+        var project = qupath.getProject();
+
+        if (project == null) {
+            Dialogs.showErrorMessage(title, "You need a project to save this classifier!");
+            return;
+        }
+
+        String name = GeneralTools.stripInvalidFilenameChars(classifierName.getText());
+        if (name.isBlank()) {
+            Dialogs.showErrorMessage(title, "Please enter a name for the classifier!");
+            return;
+        }
+
+        try {
+            var classifierNames = project.getObjectClassifiers().getNames();
+
+            if (classifierNames.stream().anyMatch(it -> it.contains("SPIAT") )) {
+                if (!Dialogs.showConfirmDialog(title, "There are already classifiers with the prefix '" + classifierName.getText() + "'. Do you want to overwrite these?"))
+                    return;
+            }
+            ObservableList<ClassifierWrapper<BufferedImage>> array = FXCollections.observableArrayList();
+            for (MarkerTableEntry marker : selectedMarkersResults) {
+                String markerClassifierName = makeClassifierName(marker.getName());
+
+
+
+                var classifier = updateClassifier(marker);
+                project.getObjectClassifiers().put(markerClassifierName, classifier);
+
+                var wrap = wrapClassifier(markerClassifierName);
+                if (!array.contains(wrap)){
+                    array.add(wrap);
+                }
+            }
+
+            tryToSave(project, array, name);
+
+//            Dialogs.showInfoNotification(title, "Saved individual classifiers with prefix '" + classifierName.getText() + "'");
+        } catch (Exception e) {
+            Dialogs.showErrorNotification(title, e);
+            return;
+        }
+
+    }
+
+
+    private String makeClassifierName(String markerName){
+        return classifierName.getText() + "_" + markerName;
+    }
+
+
+    private ObjectClassifier<BufferedImage> updateClassifier(MarkerTableEntry marker) {
+        String measurement = marker.getMarkerInfo().getMeasurementName();
+        double threshold = marker.getThreshold();
+        PathClass classAbove = PathClassFactory.getPathClass(marker.getName());
+        var classEquals = classAbove; // We use >= and if this changes the tooltip must change too!
+
+        if (measurement == null || Double.isNaN(threshold))
+            return null;
+
+        return new ClassifyByMeasurementBuilder<BufferedImage>(measurement)
+                .threshold(threshold)
+                .above(classAbove)
+                .equalTo(classEquals)
+                .build();
+    }
+
+
+    private ProjectClassifierWrapper<BufferedImage> wrapClassifier(String classifierName){
+        return new ProjectClassifierWrapper<>(qupath.getProject(), classifierName);
+    }
+
+
+    /*
+    * Code taken from Pete Bankhead's "CreateCompositeClassifier.java"
+    * */
+    private ObjectClassifier<BufferedImage> tryToBuild(Collection<ClassifierWrapper<BufferedImage>> wrappers) throws IOException {
+        var classifiers = new LinkedHashSet<ObjectClassifier<BufferedImage>>();
+        for (var wrapper : wrappers) {
+            classifiers.add(wrapper.getClassifier());
+        }
+        if (classifiers.size() < 2) {
+            Dialogs.showErrorMessage(title, "At least two different classifiers must be selected to create a composite!");
+            return null;
+        }
+        return ObjectClassifiers.createCompositeClassifier(classifiers);
+    }
+
+
+    private ObjectClassifier<BufferedImage> tryToSave(Project<BufferedImage> project, Collection<ClassifierWrapper<BufferedImage>> wrappers, String name) {
+        try {
+            var composite = tryToBuild(wrappers);
+            if (composite == null)
+                return null;
+
+            name = name == null ? null : GeneralTools.stripInvalidFilenameChars(name);
+            if (project != null && name != null && !name.isBlank()) {
+                if (project.getObjectClassifiers().contains(name)) {
+                    if (!Dialogs.showConfirmDialog(title, "Overwrite existing classifier called '" + name + "'?"))
+                        return null;
+                }
+                project.getObjectClassifiers().put(name, composite);
+                Dialogs.showInfoNotification(title, "Classifier written to project as " + name);
+            } else {
+                var file = Dialogs.promptToSaveFile(title, null, name, "JSON", ".json");
+                if (file != null) {
+                    ObjectClassifiers.writeClassifier(composite, file.toPath());
+                    Dialogs.showInfoNotification(title, "Classifier written to " + file.getAbsolutePath());
+                }
+            }
+            return composite;
+        } catch (Exception e) {
+            Dialogs.showErrorMessage(title, e);
+            return null;
+        }
+
+    }
+
+    @Override
+    public void propertyChange(PropertyChangeEvent evt) {
+
+    }
+
+    @Override
+    public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue, ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
+
+    }
+
+
+
+
+
+
+
+
+
 }

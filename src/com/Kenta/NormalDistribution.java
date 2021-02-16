@@ -41,14 +41,13 @@ public class NormalDistribution {
     }
 
     /** Getter for the density for a specified range
-     @param range The range of interest
-     @param n The number of data points
+     *
      */
-    double[] getDensityOfRange(Range range, int n){
+    double[] getDensityOfRange(double min, double max , int n){
         double[] densityArray = new double[n];
 
-        double increment = range.getDifference() / n;
-        double currentPoint = range.getMin();
+        double increment = (max-min)/ n;
+        double currentPoint = min;
 
         for (int i=0; i<n; i++){
             densityArray[i] = density(currentPoint);
