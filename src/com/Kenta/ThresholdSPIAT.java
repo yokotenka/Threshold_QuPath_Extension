@@ -10,12 +10,10 @@ import java.util.stream.IntStream;
 
 public class ThresholdSPIAT implements Thresholder{
 
-
     /** The intensities at which the density values will be present*/
     private final double[] x;
     /** Number of points in x */
     private final int n = 1024;
-
 
     /** ArrayList containing all the baseline markers*/
     private ArrayList<SPIATMarkerInformation> baselineMarkers;
@@ -25,7 +23,6 @@ public class ThresholdSPIAT implements Thresholder{
     private HashMap<String, SPIATMarkerInformation> markerInformationMap = new HashMap<>();
     /** Cells */
     private final Collection<PathObject> cells;
-
 
     /**
      * Constructor
@@ -58,8 +55,6 @@ public class ThresholdSPIAT implements Thresholder{
             x[i] = x[i - 1] + increment;
         }
     }
-
-
 
     /**
      * Calculates thresholds of all the given markers
@@ -102,7 +97,6 @@ public class ThresholdSPIAT implements Thresholder{
         // Get the max intensity
         marker.setMaxIntensity(findMax(markerIntensities).getValue());
 
-
         // Instantiate KernelDensityEstimation class
         KernelDensityEstimation kernelDensityEstimation = new KernelDensityEstimation(markerIntensities, 0, 255, n);
 
@@ -125,12 +119,10 @@ public class ThresholdSPIAT implements Thresholder{
         double threshold = -1;
 
         // For tumour marker
-        ////////############################################## Might need to change.
         if (tumourMarker != null && markerName.equals(tumourMarker.getMarkerName())) {
             // Calculations for the tumour marker
             double[] nanIncludedMarkerIntensity = cells.stream().parallel()
                     .mapToDouble(p -> p.getMeasurementList().getMeasurementValue(columnName)).toArray();
-
 
             List<Integer> filteredIntensityIndices = new ArrayList<>();
 
@@ -157,9 +149,7 @@ public class ThresholdSPIAT implements Thresholder{
                 }
             }
 
-
             double[] filteredIntensities = new double[filteredIntensityIndices.size()];
-
 
             for (int j=0; j<filteredIntensityIndices.size(); j++){
                 int inde = filteredIntensityIndices.get(j);
@@ -217,14 +207,8 @@ public class ThresholdSPIAT implements Thresholder{
         marker.setExpressionProportion(((double) count / markerIntensities.length));
         marker.setCount((int) count);
 
-//        setCellPathClass(columnName, markerName, finalThreshold);
-
         // return the threshold
         return threshold;
-    }
-
-    public Collection<PathObject> getCells() {
-        return cells;
     }
 
     /**
@@ -277,7 +261,7 @@ public class ThresholdSPIAT implements Thresholder{
 
     /** Utility class to find a value in an array along with index
      */
-    private class ValueIndexPair{
+    private static class ValueIndexPair{
         private final double value;
         private final int index;
 
@@ -286,14 +270,16 @@ public class ThresholdSPIAT implements Thresholder{
             this.index = index;
         }
 
+        // Gets the value
         public double getValue() {
             return value;
         }
+
+        // Getter for index of that value
         public int getIndex() {
             return index;
         }
     }
-
 
     /**
      * Gets the array x
@@ -312,26 +298,11 @@ public class ThresholdSPIAT implements Thresholder{
         return x[i];
     }
 
-
     /**
      * Gets the marker information map
      * @return gets the information map
      */
-
     public HashMap<String, SPIATMarkerInformation> getMarkerInformationMap() {
         return markerInformationMap;
     }
-
-    public double[][] getDensities(){
-        int size1 = markerInformationMap.size();
-        double[][] array = new double[size1][x.length];
-
-        int i=0;
-        for (SPIATMarkerInformation marker : markerInformationMap.values()){
-            array[i++] = marker.getEstimatedDensity();
-        }
-
-        return array;
-    }
-
 }

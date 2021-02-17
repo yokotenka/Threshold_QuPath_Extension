@@ -5,6 +5,10 @@ import qupath.lib.projects.Project;
 
 import java.io.IOException;
 
+/**
+ * Classifier Wrapper. Taken from Pete Bankhead: https://github.com/qupath
+ * @param <T>
+ */
 public class ProjectClassifierWrapper<T> implements ClassifierWrapper<T> {
 
     private Project<T> project;

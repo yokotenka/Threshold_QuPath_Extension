@@ -2,9 +2,6 @@ package com.Kenta;
 
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
-/*
- * ######################################### Kernel Density Estimation #################################################
- */
 /** A class for Kernel Density Estimation. There are no KDE packages that come pre-installed with QuPath hence was
  * easier to write one which didn't require installing another package.
  *
@@ -12,7 +9,6 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
  *
  * @author Kenta
  */
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 public class KernelDensityEstimation {
     /** The standard deviation which will be used for individual normal distributions */
     private double bandWidth;
@@ -23,8 +19,10 @@ public class KernelDensityEstimation {
     /** Weighting for each data point. Not implemented yet. */
     private double[] weights = null;
 
-    /** The range of the data points */
-    private Range range = null;
+    /** The min value */
+    private double min;
+    /** The max value */
+    private double max;
 
     /** The estimated kernel density array */
     private double[] estimate;
@@ -44,7 +42,10 @@ public class KernelDensityEstimation {
     KernelDensityEstimation(double[] x, double min, double max, int n){
         this.x = x;
         setBandWidthMethod("Default");
-        this.range = new Range(min, max);
+
+        assert Double.compare(max, min) > 0;
+        this.min = min;
+        this.max = max;
         this.n = n;
     }
 
@@ -53,7 +54,7 @@ public class KernelDensityEstimation {
      */
     public double[] estimate(){
         double[] kernelDensity = new double[n];
-        double[] currentDensity = new double[n];
+        double[] currentDensity;
         boolean isFirstElement = true;
 
 
@@ -67,7 +68,7 @@ public class KernelDensityEstimation {
             kernel.setMean(point);
 
             // Get the distribution of the kernel for the given range
-            currentDensity = kernel.getDensityOfRange(range.getMin(), range.getMax(), n);
+            currentDensity = kernel.getDensityOfRange(min, max, n);
 
             // Calculate the kernel density
             if (isFirstElement){
@@ -112,32 +113,4 @@ public class KernelDensityEstimation {
         return this.bandWidth;
     }
 
-
-
-    public class Range {
-        private Double min;
-        private Double max;
-
-        public Range(Double min, Double max){
-            if (min.compareTo(max) >= 0 ){
-                // Do error handling for when min is greater than equal to max
-            }
-
-            this.min = min;
-            this.max= max;
-        }
-
-        public double getMax() {
-            return max;
-        }
-
-        public double getMin() {
-            return min;
-        }
-
-        public double getDifference(){
-            return max - min;
-        }
-
-    }
 }

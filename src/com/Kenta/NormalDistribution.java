@@ -1,36 +1,26 @@
 package com.Kenta;
 import org.apache.commons.math3.util.FastMath;
 
-/*
- * ########################################### Normal Distribution Class ###############################################
- */
-/** Represtents the normal distribution. Reason for creating own class is because
+
+/** Represents the normal distribution. Reason for creating own class is because
  * org.apache.commons.math3.distribution.NormalDistribution did not have a method which returns an array of densities.
  * It was faster making a new class which does this.
  * @author Kenta
  */
-
-import org.apache.commons.math3.util.FastMath;
-
 public class NormalDistribution {
-    /** The mean of the normal distribution */
+    // The mean of the normal distribution
     private double mean = 0;
-    /** The standard deviation of the normal distribution */
+    // The standard deviation of the normal distribution
     private double standardDeviation = 1;
 
 
     /** Constructor
-     * @param mean
-     * @param standardDeviation
+     * @param mean mean for the normal distribution
+     * @param standardDeviation standard deviation of normal distribution
      */
     public NormalDistribution(double mean, double standardDeviation){
         this.mean = mean;
         this.standardDeviation = standardDeviation;
-    }
-
-    /** Constructor default is the standard normal distribution
-     */
-    NormalDistribution(){
     }
 
     /** Constructor only with the standard deviation
@@ -40,8 +30,12 @@ public class NormalDistribution {
         this.standardDeviation = standardDeviation;
     }
 
-    /** Getter for the density for a specified range
-     *
+    /**
+     * Getter for the density of a given range
+     * @param min lower bound of range
+     * @param max upper bound of range
+     * @param n the number of bins
+     * @return the density in that range
      */
     double[] getDensityOfRange(double min, double max , int n){
         double[] densityArray = new double[n];

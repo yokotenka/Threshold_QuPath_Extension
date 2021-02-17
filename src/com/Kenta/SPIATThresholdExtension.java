@@ -1,13 +1,16 @@
 package com.Kenta;
 
-import com.Kenta.ThresholdSPIATWindow;
 import org.controlsfx.control.action.Action;
 import qupath.lib.gui.ActionTools;
 import qupath.lib.gui.QuPathGUI;
 import qupath.lib.gui.extensions.QuPathExtension;
 import qupath.lib.gui.tools.MenuTools;
 
+/**
+ * QuPath extension for SPIAT Threshold
+ */
 public class SPIATThresholdExtension implements QuPathExtension {
+
     @Override
     public void installExtension(QuPathGUI quPathGUI) {
         Action spiatThresholdAction = ActionTools.createAction(new ThresholdSPIATWindow(quPathGUI), "SPIAT Threshold");
