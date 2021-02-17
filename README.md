@@ -12,3 +12,7 @@ SPIAT: https://www.biorxiv.org/content/10.1101/2020.05.28.122614v1
 - you can open multiple windows of the extension.   
 - the current window does not update when you change images.   
 - More which I have not yet found
+
+## Future features
+- add in listener so that the window updates automatically when the image changes
+- add in threshold line 
