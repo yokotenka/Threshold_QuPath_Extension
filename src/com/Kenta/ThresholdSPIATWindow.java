@@ -19,7 +19,6 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 
-import qupath.lib.classifiers.PathClassifierTools;
 import qupath.lib.classifiers.object.ObjectClassifier;
 import qupath.lib.classifiers.object.ObjectClassifiers;
 import qupath.lib.classifiers.object.ObjectClassifiers.ClassifyByMeasurementBuilder;
@@ -32,14 +31,11 @@ import qupath.lib.images.servers.ImageServer;
 import qupath.lib.objects.PathObject;
 import qupath.lib.objects.classes.PathClass;
 import qupath.lib.objects.classes.PathClassFactory;
-import qupath.lib.objects.hierarchy.PathObjectHierarchy;
 import qupath.lib.projects.Project;
 import qupath.lib.projects.Projects;
 import static qupath.lib.scripting.QP.*;
 
 import java.awt.image.BufferedImage;
-import java.beans.PropertyChangeEvent;
-import java.beans.PropertyChangeListener;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -57,7 +53,7 @@ public class ThresholdSPIATWindow implements Runnable{
     // Currently opened viewer in qupath
 
 
-    private Map<QuPathViewer, ThresholdSPIATWindowPane> paneMap = new WeakHashMap<>();
+    private ThresholdSPIATWindowPane pane;
 
 
     /**
@@ -95,10 +91,10 @@ public class ThresholdSPIATWindow implements Runnable{
                     "No Cells are detected. Must have cell detections to run SPIAT");
             return;
         }
-        var pane = paneMap.get(viewer);
+//        var pane = paneMap.get(viewer);
         if (pane == null) {
             pane = new ThresholdSPIATWindowPane(qupath, viewer);
-            paneMap.put(viewer, pane);
+//            paneMap.put(viewer, pane);
         }
         pane.show();
     }
@@ -173,6 +169,10 @@ public class ThresholdSPIATWindow implements Runnable{
 
         private Stage dialog;
         private Stage stage;
+
+        private HashMap<String, ObservableList<MarkerTableEntry>> selectedMarkersResultsMap = new HashMap<>();
+        private HashMap<String, ArrayList<SPIATMarkerInformation>> selectedMarkersMap = new HashMap<>();
+        private HashMap<String, ThresholdSPIAT> thresholdMap = new HashMap<>();
 
         public ThresholdSPIATWindowPane(QuPathGUI qupath, QuPathViewer viewer){
             this.qupath = qupath;
@@ -274,10 +274,9 @@ public class ThresholdSPIATWindow implements Runnable{
             saveResultsTableButton = new Button("Save");
             gridPane.add(saveResultsTableButton, 6, row_col3++, 1, 1);
 
-
             // Action upon pressing the start button
             startButton.setOnAction((event) -> {
-
+                comboBoxResults.setValue(null);
                 // Collect the options
                 String tumourMarkerName = tumourBox.getValue();
                 StringBuilder invalidInputs = new StringBuilder();
@@ -365,6 +364,10 @@ public class ThresholdSPIATWindow implements Runnable{
                 // Clear previous results if exists
                 lineChart.getData().clear();
                 populateLineChart();
+
+                thresholdMap.put(imageData.getServer().getMetadata().getName(), thresholdSPIAT);
+                selectedMarkersResultsMap.put(imageData.getServer().getMetadata().getName(), selectedMarkersResults);
+                selectedMarkersMap.put(imageData.getServer().getMetadata().getName(), selectedMarkers);
             });
 
             // Get the currently selected cells
@@ -372,9 +375,15 @@ public class ThresholdSPIATWindow implements Runnable{
 
             // ComboBox for results
             comboBoxResults.setOnAction((event) -> {
+                if (thresholdSPIAT == null){
+                    return;
+                }
 
                 // Get the selected marker
                 String selectedForResults = comboBoxResults.getValue();
+                if (selectedForResults == null){
+                    return;
+                }
 
                 // Index of the current marker
                 int i = 0;
@@ -483,14 +492,17 @@ public class ThresholdSPIATWindow implements Runnable{
         }
         
         private void updateSelectedForResults(){
-            selectedMarkers = new ArrayList();
-            comboBoxResults.setItems(FXCollections.observableList(
-                    selectedMarkers
-                            .stream()
-                            .map(SPIATMarkerInformation::getMarkerName)
-                            .collect(Collectors.toCollection(ArrayList::new))
-                    )
-            );
+            if (selectedMarkers != null) {
+                comboBoxResults.setItems(FXCollections.observableList(
+                        selectedMarkers
+                                .stream()
+                                .map(SPIATMarkerInformation::getMarkerName)
+                                .collect(Collectors.toCollection(ArrayList::new))
+                        )
+                );
+            } else {
+                comboBoxResults.setItems(FXCollections.observableArrayList());
+            }
         }
 
         private void updateMeasurements () {
@@ -528,6 +540,15 @@ public class ThresholdSPIATWindow implements Runnable{
             }
         }
 
+        private void updateComboBoxTumour(){
+            tumourBox.setItems(FXCollections.observableList(
+                    markers
+                            .stream()
+                            .map(MarkerTableEntry::getName)
+                            .collect(Collectors.toCollection(ArrayList::new))
+            ));
+        }
+
         private void updateOptionsTable () {
             optionsTable.setItems(markers);
         }
@@ -536,6 +557,33 @@ public class ThresholdSPIATWindow implements Runnable{
             resultsTable.setItems(selectedMarkersResults);
         }
 
+        private void refreshOptions () {
+            updateQuPath();
+            updateMeasurements();
+            updateMarkers();
+            updateComboBoxTumour();
+
+            selectedMarkers = selectedMarkersMap.getOrDefault(imageData.getServer().getMetadata().getName(), null);
+            selectedMarkersResults = selectedMarkersResultsMap.getOrDefault(imageData.getServer().getMetadata().getName(), null);
+            thresholdSPIAT = thresholdMap.getOrDefault(imageData.getServer().getMetadata().getName(), null);
+
+
+
+            updateSelectedForResults();
+            updateOptionsTable();
+            updateResultsTable();
+            updateTitle();
+            if (thresholdSPIAT==null){
+                lineChart.getData().clear();
+            }else{
+                populateLineChart();
+            }
+        }
+
+        @Override
+        public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue, ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
+            refreshOptions();
+        }
 
         // ****************************** JavaFx helper methods **************************** //
 
@@ -778,23 +826,6 @@ public class ThresholdSPIATWindow implements Runnable{
 //
 //        }
 
-
-        private void refreshOptions () {
-            updateQuPath();
-            updateMeasurements();
-            updateMarkers();
-            updateSelectedForResults();
-            selectedMarkersResults = null;
-            updateOptionsTable();
-            updateResultsTable();
-            lineChart.getData().clear();
-            updateTitle();
-        }
-
-        @Override
-        public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue, ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
-            refreshOptions();
-        }
 
 
 //        @Override
