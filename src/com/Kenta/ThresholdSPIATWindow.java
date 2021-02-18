@@ -278,6 +278,17 @@ public class ThresholdSPIATWindow implements Runnable{
 
             // Action upon pressing the start button
             startButton.setOnAction((event) -> {
+                if (imageData == null){
+                    Dialogs.showErrorMessage(title, "No images open");
+                    return;
+                }
+
+                if (cells == null){
+                    Dialogs.showErrorMessage(title, "No Cells are detected");
+                    return;
+                }
+
+
                 comboBoxResults.setValue(null);
                 // Collect the options
                 String tumourMarkerName = tumourBox.getValue();
@@ -433,6 +444,15 @@ public class ThresholdSPIATWindow implements Runnable{
             // Save the classifiers and apply the classifier
             saveClassifierButton.setOnAction((event) -> {
                 // Apply classifier
+                if (imageData == null){
+                    Dialogs.showErrorMessage(title, "Nothing to save");
+                    return;
+                }
+                if (thresholdSPIAT == null){
+                    Dialogs.showErrorMessage(title, "No Results to save");
+                    return;
+                }
+
                 imageData.getHierarchy().getDetectionObjects().forEach(it -> it.setPathClass(null));
                 setCellPathClass();
                 // Save classifier
@@ -441,6 +461,14 @@ public class ThresholdSPIATWindow implements Runnable{
 
             // Choose the directory for the table to be saved to.
             chooseButton.setOnAction((event) -> {
+                if (imageData == null){
+                    Dialogs.showErrorMessage(title, "Nothing to save");
+                    return;
+                }
+                if (thresholdSPIAT == null){
+                    Dialogs.showErrorMessage(title, "No Results to save");
+                    return;
+                }
                 String ext = ".csv";
                 String defaultName = "SPIAT_Table_Results";
                 String extDesc = "CSV (Comma delimited)";
@@ -459,6 +487,14 @@ public class ThresholdSPIATWindow implements Runnable{
 
             // Save the results table
             saveResultsTableButton.setOnAction((event) -> {
+                if (imageData == null){
+                    Dialogs.showErrorMessage(title, "Nothing to save");
+                    return;
+                }
+                if (thresholdSPIAT == null){
+                    Dialogs.showErrorMessage(title, "No Results to save");
+                    return;
+                }
                 String fullFileName = resultsTableName.getText();
                 try {
                     writeExcel(fullFileName, selectedMarkersResults);
@@ -489,12 +525,21 @@ public class ThresholdSPIATWindow implements Runnable{
         private void updateQuPath() {
             server = viewer.getServer();
             imageData = viewer.getImageData();
-            cells = imageData.getHierarchy().getCellObjects();
+            try {
+                cells = imageData.getHierarchy().getCellObjects();
+            }
+            catch (Exception ex){
+                cells = null;
+            }
         }
 
         // Updates the title of the window
         private void updateTitle() {
-            stage.setTitle(title + " (" + imageData.getServer().getMetadata().getName() + ")");
+            try {
+                stage.setTitle(title + " (" + imageData.getServer().getMetadata().getName() + ")");
+            }catch(Exception e){
+                stage.setTitle(title);
+            }
         }
 
         // Sets the selected for results array to null if results don't already exist
@@ -527,6 +572,10 @@ public class ThresholdSPIATWindow implements Runnable{
 
         // Updates the markers which are available
         private void updateMarkers() {
+            if (imageData == null){
+                markers = null;
+                return;
+            }
             markers = markersMap.getOrDefault(imageData.getServerPath(), null);
             if (markers == null) {
                 // For collecting options
@@ -554,12 +603,16 @@ public class ThresholdSPIATWindow implements Runnable{
 
         // Updates the tumour marker selection box
         private void updateComboBoxTumour() {
-            tumourBox.setItems(FXCollections.observableList(
-                    markers
-                            .stream()
-                            .map(MarkerTableEntry::getName)
-                            .collect(Collectors.toCollection(ArrayList::new))
-            ));
+            if (markers != null) {
+                tumourBox.setItems(FXCollections.observableList(
+                        markers
+                                .stream()
+                                .map(MarkerTableEntry::getName)
+                                .collect(Collectors.toCollection(ArrayList::new))
+                ));
+            } else{
+                tumourBox.setItems(null);
+            }
         }
 
         // Updates the options table
@@ -578,9 +631,16 @@ public class ThresholdSPIATWindow implements Runnable{
             updateMarkers();
             updateComboBoxTumour();
 
-            selectedMarkers = selectedMarkersMap.getOrDefault(imageData.getServerPath(), null);
-            selectedMarkersResults = selectedMarkersResultsMap.getOrDefault(imageData.getServerPath(), null);
-            thresholdSPIAT = thresholdMap.getOrDefault(imageData.getServerPath(), null);
+            try {
+                String serverPath = imageData.getServerPath();
+                selectedMarkers = selectedMarkersMap.getOrDefault(serverPath, null);
+                selectedMarkersResults = selectedMarkersResultsMap.getOrDefault(serverPath, null);
+                thresholdSPIAT = thresholdMap.getOrDefault(serverPath, null);
+            } catch (Exception e){
+                selectedMarkers = null;
+                selectedMarkersResults = null;
+                thresholdSPIAT = null;
+            }
 
             updateSelectedForResults();
             updateOptionsTable();
@@ -594,7 +654,8 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         @Override
-        public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue, ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
+        public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue,
+                            ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
             refreshOptions();
         }
 
