@@ -77,9 +77,7 @@ public class ThresholdSPIATWindow implements Runnable{
         // Need to add in way to check for opened windows
 //
         var viewer = qupath.getViewer();
-////        Dialogs.showInfoNotification("Viewer", qupath.getViewer().);
-//        var pane = paneMap.get(viewer);
-//        if (pane == null) {
+
         if (viewer == null){
             Dialogs.showErrorMessage("SPIAT Threshold", "Viewer is empty. Please open an image.");
             return;
@@ -97,23 +95,16 @@ public class ThresholdSPIATWindow implements Runnable{
                     "No Cells are detected. Must have cell detections to run SPIAT");
             return;
         }
-        ThresholdSPIATWindowPane pane = new ThresholdSPIATWindowPane(qupath, viewer);
-//            paneMap.put(viewer, pane);
-//        }
-        pane.getDialog().show();
+        var pane = paneMap.get(viewer);
+        if (pane == null) {
+            pane = new ThresholdSPIATWindowPane(qupath, viewer);
+            paneMap.put(viewer, pane);
+        }
+        pane.show();
     }
 
 
-//    @Override
-//    public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue,
-//                        ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
-//        var viewer = qupath.getViewer();
-//        viewer.addViewerListener(this);
-//
-//    }
-
-
-    static class ThresholdSPIATWindowPane {
+    static class ThresholdSPIATWindowPane implements ChangeListener<ImageData<BufferedImage>>{
         private QuPathGUI qupath;
 
         private QuPathViewer viewer;
@@ -177,9 +168,11 @@ public class ThresholdSPIATWindow implements Runnable{
         private Collection<PathObject> currentlySelected;
 
         // The title of the current window
-        private final String title = "SPIAT Threshold";
+        private String title = "SPIAT Threshold";
+
 
         private Stage dialog;
+        private Stage stage;
 
         public ThresholdSPIATWindowPane(QuPathGUI qupath, QuPathViewer viewer){
             this.qupath = qupath;
@@ -189,6 +182,11 @@ public class ThresholdSPIATWindow implements Runnable{
             cells = imageData.getHierarchy().getCellObjects();
 
             createDialog();
+        }
+
+        public void show(){
+            viewer.imageDataProperty().addListener(this);
+            dialog.show();
         }
 
 
@@ -360,7 +358,7 @@ public class ThresholdSPIATWindow implements Runnable{
                 );
 
                 // Add to the results table
-                resultsTable.getTable().getItems().clear();
+//                resultsTable.getTable().getItems().clear();
                 updateResultsTable();
 
                 // populate the graph
@@ -458,10 +456,10 @@ public class ThresholdSPIATWindow implements Runnable{
             });
 
             // Initialise stage
-            Stage stage = new Stage();
+            stage = new Stage();
             stage.initOwner(QuPathGUI.getInstance().getStage());
             stage.setScene(new Scene(gridPane));
-            stage.setTitle(title);
+            updateTitle();
             stage.setHeight(500);
             stage.setWidth(750);
 
@@ -474,10 +472,26 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // ************************* Refresh methods ************************* //
-//        private void updateQuPath(){
-//
-//        }
-
+        private void updateQuPath(){
+            server = viewer.getServer();
+            imageData = viewer.getImageData();
+            cells = imageData.getHierarchy().getCellObjects();
+        }
+        
+        private void updateTitle(){
+            stage.setTitle(title + " (" + imageData.getServer().getMetadata().getName() + ")");
+        }
+        
+        private void updateSelectedForResults(){
+            selectedMarkers = new ArrayList();
+            comboBoxResults.setItems(FXCollections.observableList(
+                    selectedMarkers
+                            .stream()
+                            .map(SPIATMarkerInformation::getMarkerName)
+                            .collect(Collectors.toCollection(ArrayList::new))
+                    )
+            );
+        }
 
         private void updateMeasurements () {
             // Collect the measurement names
@@ -766,15 +780,20 @@ public class ThresholdSPIATWindow implements Runnable{
 
 
         private void refreshOptions () {
-//            updateQuPath();
-
+            updateQuPath();
             updateMeasurements();
             updateMarkers();
-
+            updateSelectedForResults();
             selectedMarkersResults = null;
             updateOptionsTable();
             updateResultsTable();
             lineChart.getData().clear();
+            updateTitle();
+        }
+
+        @Override
+        public void changed(ObservableValue<? extends ImageData<BufferedImage>> observableValue, ImageData<BufferedImage> bufferedImageImageData, ImageData<BufferedImage> t1) {
+            refreshOptions();
         }
 
 
