@@ -100,7 +100,7 @@ public class ThresholdSPIATWindow implements Runnable{
     }
 
 
-    static class ThresholdSPIATWindowPane implements ChangeListener<ImageData<BufferedImage>>{
+    static class ThresholdSPIATWindowPane implements ChangeListener<ImageData<BufferedImage>> {
         private QuPathGUI qupath;
 
         private QuPathViewer viewer;
@@ -170,11 +170,12 @@ public class ThresholdSPIATWindow implements Runnable{
         private Stage dialog;
         private Stage stage;
 
+        private HashMap<String, ObservableList<MarkerTableEntry>> markersMap = new HashMap<>();
         private HashMap<String, ObservableList<MarkerTableEntry>> selectedMarkersResultsMap = new HashMap<>();
         private HashMap<String, ArrayList<SPIATMarkerInformation>> selectedMarkersMap = new HashMap<>();
         private HashMap<String, ThresholdSPIAT> thresholdMap = new HashMap<>();
 
-        public ThresholdSPIATWindowPane(QuPathGUI qupath, QuPathViewer viewer){
+        public ThresholdSPIATWindowPane(QuPathGUI qupath, QuPathViewer viewer) {
             this.qupath = qupath;
             this.viewer = viewer;
             server = viewer.getServer();
@@ -184,7 +185,7 @@ public class ThresholdSPIATWindow implements Runnable{
             createDialog();
         }
 
-        public void show(){
+        public void show() {
             viewer.imageDataProperty().addListener(this);
             dialog.show();
         }
@@ -192,9 +193,10 @@ public class ThresholdSPIATWindow implements Runnable{
 
         /**
          * Formats and creates the stage which will be showed.
+         *
          * @return Stage to be displayed when the extension is callled
          */
-        protected Stage createDialog () {
+        protected Stage createDialog() {
 
 //            updateQuPath();
 
@@ -365,9 +367,10 @@ public class ThresholdSPIATWindow implements Runnable{
                 lineChart.getData().clear();
                 populateLineChart();
 
-                thresholdMap.put(imageData.getServer().getMetadata().getName(), thresholdSPIAT);
-                selectedMarkersResultsMap.put(imageData.getServer().getMetadata().getName(), selectedMarkersResults);
-                selectedMarkersMap.put(imageData.getServer().getMetadata().getName(), selectedMarkers);
+                markersMap.put(imageData.getServerPath(), markers);
+                thresholdMap.put(imageData.getServerPath(), thresholdSPIAT);
+                selectedMarkersResultsMap.put(imageData.getServerPath(), selectedMarkersResults);
+                selectedMarkersMap.put(imageData.getServerPath(), selectedMarkers);
             });
 
             // Get the currently selected cells
@@ -375,13 +378,13 @@ public class ThresholdSPIATWindow implements Runnable{
 
             // ComboBox for results
             comboBoxResults.setOnAction((event) -> {
-                if (thresholdSPIAT == null){
+                if (thresholdSPIAT == null) {
                     return;
                 }
 
                 // Get the selected marker
                 String selectedForResults = comboBoxResults.getValue();
-                if (selectedForResults == null){
+                if (selectedForResults == null) {
                     return;
                 }
 
@@ -476,22 +479,26 @@ public class ThresholdSPIATWindow implements Runnable{
             return stage;
         }
 
-        public Stage getDialog(){
+        public Stage getDialog() {
             return dialog;
         }
 
         // ************************* Refresh methods ************************* //
-        private void updateQuPath(){
+
+        // Updates the attributes associated with the qupath gui
+        private void updateQuPath() {
             server = viewer.getServer();
             imageData = viewer.getImageData();
             cells = imageData.getHierarchy().getCellObjects();
         }
-        
-        private void updateTitle(){
+
+        // Updates the title of the window
+        private void updateTitle() {
             stage.setTitle(title + " (" + imageData.getServer().getMetadata().getName() + ")");
         }
-        
-        private void updateSelectedForResults(){
+
+        // Sets the selected for results array to null if results don't already exist
+        private void updateSelectedForResults() {
             if (selectedMarkers != null) {
                 comboBoxResults.setItems(FXCollections.observableList(
                         selectedMarkers
@@ -505,7 +512,8 @@ public class ThresholdSPIATWindow implements Runnable{
             }
         }
 
-        private void updateMeasurements () {
+        // Updates the measurements that are available
+        private void updateMeasurements() {
             // Collect the measurement names
             getMarkerMeasurementNames();
             // Set the default Measurement to Cell mean if it exists
@@ -517,30 +525,35 @@ public class ThresholdSPIATWindow implements Runnable{
             }
         }
 
-        private void updateMarkers () {
-            // For collecting options
-            markers = FXCollections.observableArrayList();
-            markerNames = FXCollections.observableArrayList();
-            columnNames = FXCollections.observableArrayList(markerMeasurements);
+        // Updates the markers which are available
+        private void updateMarkers() {
+            markers = markersMap.getOrDefault(imageData.getServerPath(), null);
+            if (markers == null) {
+                // For collecting options
+                markers = FXCollections.observableArrayList();
+                markerNames = FXCollections.observableArrayList();
+                columnNames = FXCollections.observableArrayList(markerMeasurements);
 
-            // Create the entries for the table rows
-            for (int i = 0; i < server.nChannels(); i++) {
-                String markerName = server.getChannel(i).getName();
-                markerNames.add(markerName);
+                // Create the entries for the table rows
+                for (int i = 0; i < server.nChannels(); i++) {
+                    String markerName = server.getChannel(i).getName();
+                    markerNames.add(markerName);
 
-                markers.add(
-                        new MarkerTableEntry(
-                                server.getChannel(i).getName(),
-                                true,
-                                false,
-                                columnNames,
-                                defaultValue
-                        )
-                );
+                    markers.add(
+                            new MarkerTableEntry(
+                                    server.getChannel(i).getName(),
+                                    true,
+                                    false,
+                                    columnNames,
+                                    defaultValue
+                            )
+                    );
+                }
             }
         }
 
-        private void updateComboBoxTumour(){
+        // Updates the tumour marker selection box
+        private void updateComboBoxTumour() {
             tumourBox.setItems(FXCollections.observableList(
                     markers
                             .stream()
@@ -549,33 +562,33 @@ public class ThresholdSPIATWindow implements Runnable{
             ));
         }
 
-        private void updateOptionsTable () {
+        // Updates the options table
+        private void updateOptionsTable() {
             optionsTable.setItems(markers);
         }
 
-        private void updateResultsTable () {
+        // Updates the results table
+        private void updateResultsTable() {
             resultsTable.setItems(selectedMarkersResults);
         }
 
-        private void refreshOptions () {
+        private void refreshOptions() {
             updateQuPath();
             updateMeasurements();
             updateMarkers();
             updateComboBoxTumour();
 
-            selectedMarkers = selectedMarkersMap.getOrDefault(imageData.getServer().getMetadata().getName(), null);
-            selectedMarkersResults = selectedMarkersResultsMap.getOrDefault(imageData.getServer().getMetadata().getName(), null);
-            thresholdSPIAT = thresholdMap.getOrDefault(imageData.getServer().getMetadata().getName(), null);
-
-
+            selectedMarkers = selectedMarkersMap.getOrDefault(imageData.getServerPath(), null);
+            selectedMarkersResults = selectedMarkersResultsMap.getOrDefault(imageData.getServerPath(), null);
+            thresholdSPIAT = thresholdMap.getOrDefault(imageData.getServerPath(), null);
 
             updateSelectedForResults();
             updateOptionsTable();
             updateResultsTable();
             updateTitle();
-            if (thresholdSPIAT==null){
+            if (thresholdSPIAT == null) {
                 lineChart.getData().clear();
-            }else{
+            } else {
                 populateLineChart();
             }
         }
@@ -588,7 +601,7 @@ public class ThresholdSPIATWindow implements Runnable{
         // ****************************** JavaFx helper methods **************************** //
 
         // Creates label for the javafx nodes
-        private Label createLabel (String msg){
+        private Label createLabel(String msg) {
             Label label = new Label(msg);
             label.setFont(javafx.scene.text.Font.font(14));
             label.setAlignment(Pos.CENTER);
@@ -596,7 +609,7 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Initialises the line chart
-        private LineChart<Number, Number> initialiseLineChart () {
+        private LineChart<Number, Number> initialiseLineChart() {
 
             final NumberAxis xAxis = new NumberAxis();
             final NumberAxis yAxis = new NumberAxis();
@@ -616,7 +629,7 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Populates the line chart
-        private void populateLineChart () {
+        private void populateLineChart() {
             if (thresholdSPIAT != null) {
                 lineChart.getData().clear();
                 int i = 0;
@@ -637,7 +650,7 @@ public class ThresholdSPIATWindow implements Runnable{
 
         // Extracts the measurements for each marker
         // Must be a better way to access the measurements
-        private void getMarkerMeasurementNames () {
+        private void getMarkerMeasurementNames() {
 
             // Do something for when no cell detected
             if (cells == null) {
@@ -657,7 +670,7 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Sets the path class for each of the cells
-        private void setCellPathClass () {
+        private void setCellPathClass() {
             for (SPIATMarkerInformation marker : thresholdSPIAT.getMarkerInformationMap().values()) {
                 List<PathObject> positive = cells.stream().parallel().filter(it ->
                         it.getMeasurementList().getMeasurementValue(marker.getMeasurementName())
@@ -682,7 +695,7 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Writes the results table as a csv to the specified fileName
-        private void writeExcel (String fileName, ObservableList < MarkerTableEntry > markers) throws Exception {
+        private void writeExcel(String fileName, ObservableList<MarkerTableEntry> markers) throws Exception {
             try {
                 File file = new File(fileName);
                 Writer writer = new BufferedWriter(new FileWriter(file));
@@ -708,7 +721,7 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Save the classifiers
-        private void saveClassifiers () {
+        private void saveClassifiers() {
             // Get project
             var project = qupath.getProject();
             // Check if project is null
@@ -745,12 +758,12 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Makes the classifier name for individual markers
-        private String makeClassifierName (String markerName){
+        private String makeClassifierName(String markerName) {
             return classifierName.getText() + "_" + markerName;
         }
 
         // Initialises the classifier which will be saved
-        private ObjectClassifier<BufferedImage> updateClassifier (MarkerTableEntry marker){
+        private ObjectClassifier<BufferedImage> updateClassifier(MarkerTableEntry marker) {
             String measurement = marker.getMarkerInfo().getMeasurementName();
             double threshold = marker.getThreshold();
             PathClass classAbove = PathClassFactory.getPathClass(marker.getName());
@@ -767,7 +780,7 @@ public class ThresholdSPIATWindow implements Runnable{
         }
 
         // Wraps classifier in the ProjectClassifierWrapper so it can be saved via the QuPath API
-        private ProjectClassifierWrapper<BufferedImage> wrapClassifier (String classifierName){
+        private ProjectClassifierWrapper<BufferedImage> wrapClassifier(String classifierName) {
             return new ProjectClassifierWrapper<>(qupath.getProject(), classifierName);
         }
 
@@ -775,8 +788,8 @@ public class ThresholdSPIATWindow implements Runnable{
         /*
          ******************** Code taken from Pete Bankhead's "CreateCompositeClassifier.java" *****************************
          * */
-        private ObjectClassifier<BufferedImage> tryToBuild (Collection < ClassifierWrapper < BufferedImage >> wrappers) throws
-        IOException {
+        private ObjectClassifier<BufferedImage> tryToBuild(Collection<ClassifierWrapper<BufferedImage>> wrappers) throws
+                IOException {
             var classifiers = new LinkedHashSet<ObjectClassifier<BufferedImage>>();
             for (var wrapper : wrappers) {
                 classifiers.add(wrapper.getClassifier());
@@ -789,9 +802,9 @@ public class ThresholdSPIATWindow implements Runnable{
             return ObjectClassifiers.createCompositeClassifier(classifiers);
         }
 
-        private ObjectClassifier<BufferedImage> tryToSave (Project < BufferedImage > project,
-                Collection < ClassifierWrapper < BufferedImage >> wrappers,
-                String name){
+        private ObjectClassifier<BufferedImage> tryToSave(Project<BufferedImage> project,
+                                                          Collection<ClassifierWrapper<BufferedImage>> wrappers,
+                                                          String name) {
             try {
                 var composite = tryToBuild(wrappers);
                 if (composite == null)
@@ -819,20 +832,5 @@ public class ThresholdSPIATWindow implements Runnable{
             }
 
         }
-
-        // Yet to be implemented.
-//        @Override
-//        public void propertyChange (PropertyChangeEvent evt){
-//
-//        }
-
-
-
-//        @Override
-//        public void changed (ObservableValue < ? extends ImageData<BufferedImage>>observable,
-//                ImageData < BufferedImage > oldValue, ImageData < BufferedImage > newValue){
-//
-//            refreshOptions();
-//        }
     }
 }
