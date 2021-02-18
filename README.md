@@ -9,7 +9,8 @@ Implements the SPIAT threshold method for multiplexed immunohistochemistry marke
 2. A baseline marker is a marker which is not present in tumour cells. For example, CD45, CD3, CD8 etc are not expressed in tumour cells. Hence we would select these as baseline markers. 
 3. Choose where the marker is expressed. eg. Cell, Cytoplasm, Membrane etc. Select tumour marker. 
 4. Press run to see the results
-5. You can save and apply the classifiers and also save the displayed statistics as a csv file. 
+5. Selecting the marker in the results selection box will highlight cells which are positive to that marker on the image. 
+6. You can save and apply the classifiers and also save the displayed statistics as a csv file. 
 
 ## References
 SPIAT: https://www.biorxiv.org/content/10.1101/2020.05.28.122614v1
