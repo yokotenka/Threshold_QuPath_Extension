@@ -9,6 +9,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart.Data;
@@ -17,6 +18,7 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.StackPane;
+import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
 import qupath.lib.classifiers.object.ObjectClassifier;
@@ -137,6 +139,8 @@ public class ThresholdSPIATWindow implements Runnable{
         private Button chooseButton;
         // Options table
         private TableCreator optionsTable;
+        // Threshold line
+        private Series<Number, Number> thresholdLine;
 
         // All the different markers in the current image
         private ObservableList<MarkerTableEntry> markers;
@@ -409,6 +413,30 @@ public class ThresholdSPIATWindow implements Runnable{
                     // Set the selected marker to be visible and update line chart
                     if (marker.getMarkerName().equals(selectedForResults)) {
                         lineChart.getData().get(i).getNode().setVisible(true);
+
+                        Series<Number, Number> line = new Series<>();
+                        line.getData().add(new Data<>(marker.getThreshold(), 0));
+                        line.getData().add(new Data<>(marker.getThreshold(), marker.getMaxDensity() * 1.25));
+
+                        Color color = Color.RED;
+                        String rgb = String.format("%d, %d, %d",
+                                (int) (color.getRed() * 255),
+                                (int) (color.getGreen() * 255),
+                                (int) (color.getBlue() * 255));
+
+
+                        if (thresholdLine != null) {
+                            lineChart.getData().remove(thresholdLine);
+                        }
+
+
+
+
+                        thresholdLine = line;
+                        lineChart.getData().add(line);
+
+                        Node node = line.getNode().lookup(".chart-series-line");
+                        node.setStyle("-fx-stroke: rgba(" + rgb + ", 0.3);");
 
                         // The x and y axis for the line chart
                         NumberAxis yAxis = (NumberAxis) lineChart.getYAxis();
