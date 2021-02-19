@@ -6,7 +6,7 @@ Implements the SPIAT threshold method for multiplexed immunohistochemistry marke
 
 ## How to use
 1. On the options table, select the marker you would like to apply the threshold on. 
-2. A baseline marker is a marker which is not present in tumour cells. For example, CD45, CD3, CD8 etc are not expressed in tumour cells. Hence we would select these as baseline markers. 
+2. A baseline marker is a marker which is not present in tumour cells. For example, CD45, CD3, CD8 etc are not expressed in tumour cells. Hence we would select these as baseline markers. Select all markers which should not be expressed in tumour cells as baseline markers.
 3. Choose where the marker is expressed. eg. Cell, Cytoplasm, Membrane etc. Select tumour marker. 
 4. Press run to see the results
 5. Selecting the marker in the results selection box will highlight cells which are positive to that marker on the image. 
